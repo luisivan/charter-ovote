@@ -15,8 +15,13 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
+    
       <main className={styles.main}>
-        <h1 className={styles.title}>Welcome to the Aragon DAO 🦅</h1>
+        <img src="/aragon.png" className={styles.logo} />
+        <div className={styles.header}>
+          <img src="/fight-for-freedom.svg" className={styles.fff} />
+        </div>
+        
         <iframe className={styles.iframe} src="https://linked.md/v?u=https://linked.md/api/github/luisivan/charter-ovote/main/Charter.linked.md"></iframe>
         <input type="checkbox" name="accept" value="true"/>
         <label for="accept">I have read and accept the terms outlined above by joining the Aragon DAO</label>
