@@ -94,6 +94,7 @@ contract charterovote {
 		uint256 receiptsRoot,
 		uint64 result,
 		uint64 nVotes
+    uint[2] memory a, uint[2][2] memory b, uint[2] memory c
         ) public {
 		// check that id has a process
 		require(id<=lastProcessID, "process id does not exist");
@@ -112,6 +113,9 @@ contract charterovote {
 		// check that nVotes <= process.censusSize
 		require(nVotes <= processes[id].censusSize,
 			"nVotes <= processes[id].censusSize");
+
+    // TODO build inputs array (using Process parameters from processes mapping)
+    // TODO call zk snark verification here when ready!!!
 
 		// note: for the moment the next checks are done in the contract
 		require(nVotes <= process.censusSize,
