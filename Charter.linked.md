@@ -1,8 +1,8 @@
 Person, Contract, Claim, Legal Order, Legal Proceeding, Liability, Liable, Lien
-: Import definitions https://linked.md/api/fetch?path=nation3/law/main/shared/primitives/Basic.linked.md
+: Import definitions https://linked.md/v?u=https://linked.md/api/github/nation3/law/main/shared/primitives/Basic.linked.md
 
 Decentralized Autonomous Organization
-: Import definitions https://linked.md/api/fetch?path=nation3/law/main/shared/primitives/DAO.linked.md
+: Import definitions https://linked.md/v?u=https://linked.md/api/github/nation3/law/main/shared/primitives/DAO.linked.md
 
 DAO
 : The Nation3 Decentralized Autonomous Organization pushing forward the vision outlined in the Aragon Manifesto.
