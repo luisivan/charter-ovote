@@ -26,7 +26,7 @@ powers_of_tau() {
 
 compile_and_ts() {
 	CIRCUITCODE="pragma circom 2.0.0;
-	include \"../circuits/src/oav-charter.circom\";
+	include \"../../../../circuits/src/oav-charter.circom\";
 	component main {public [chainID, processID, censusRoot, weight, nullifier, vote, charterHash]} = oav($NLEVELS);"
 
 	mkdir -p $CIRCUITPATH/$BUILD
@@ -94,7 +94,7 @@ date
 
 NLEVELS=7
 NAME=$(echo "2 ^ $NLEVELS" | bc)
-CIRCUITPATH=ovote/dev/$NAME
+CIRCUITPATH=ts-dev/dev/$NAME
 echo "compile_and_ts() of $CIRCUITPATH"
 compile_and_ts
 compute_hashes
