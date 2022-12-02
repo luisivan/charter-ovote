@@ -1,23 +1,33 @@
 import { FC, useState } from "react";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
-import { providers } from "ethers";
+import { Contract, providers } from "ethers";
 import { ABI } from "../lib/constants";
+import { Else, If, Then, When } from "react-if";
 
-let Hermez: any;
+// TODO: Set the right value
+const CONTRACT_ADDRESS = "0x1234";
+
+let JsBundle: any = {};
 if (typeof window !== "undefined") {
+  // Note: Dirty hack to access NodeJS-only Hermez library that only works bundled with through Browserify
+  //       Will only work on browsers after the <script> tag is loaded
+  //       Real solution is to rewrite the zk libraries in pure JS that runs universally
+
   // @ts-ignore
-  Hermez = window.getVocdoni();
+  JsBundle = window.getBundle();
 }
 
 const Index: FC = () => {
+  const { HermezWallet } = JsBundle;
   const [provider, setProvider] = useState<providers.Web3Provider>();
+  const [charterAccepted, setCharterAccepted] = useState(false);
   const [account, setAccount] = useState<string>();
   const [hermezWalletAddress, setHermezWalletAddress] = useState<string>();
 
-  const connect = async () => {
+  const connectWallet = async () => {
     if (!window.ethereum?.request) {
-      alert("MetaMask is not installed!");
+      alert("MetaMask is not installed");
       return;
     }
 
@@ -38,22 +48,81 @@ const Index: FC = () => {
   //   }
   // };
 
-  const createHermezWallet = async function createWallet() {
-    if (provider && account) {
-      const signer = provider.getSigner();
-      const hermezWallet = Hermez.HermezWallet.createWalletFromEtherAccount(
-        signer,
-      );
-      return hermezWallet;
-    }
+  const getHermezWallet = async function () {
+    if (!provider || !account) return alert("Not connected");
+
+    const signer = provider.getSigner();
+    return HermezWallet.createWalletFromEtherAccount(
+      signer,
+    );
   };
 
-  const setHermezAddress = async () => {
-    if (provider && account) {
-      const hermezWalletAndAddress = await createHermezWallet();
-      const hermezWalletAddress = hermezWalletAndAddress?.hermezEthereumAddress;
-      setHermezWalletAddress(hermezWalletAddress);
-    }
+  const newVote = async () => {
+    if (!account || !provider) return alert("Not connected");
+
+    let contract = new Contract(CONTRACT_ADDRESS, ABI, provider.getSigner());
+    contract = contract.connect(provider);
+
+    // TODO: create several wallets
+    const hWallet = await getHermezWallet();
+
+    // TODO: generate census
+
+    // TODO: send create vote TX
+    /*
+    const tx = await contract.functions.newProcess(
+      txHash,
+      censusRoot,
+      censusSize,
+      resPubStartBlock,
+      resPubWindow,
+      minParticipation,
+      typ,
+    );
+
+    await tx.wait();
+
+    alert("Created");
+    */
+  };
+
+  const handleVote = async (approveValue: boolean) => {
+    if (!provider || !account) return alert("Not connected");
+
+    const hermezWallet = await getHermezWallet();
+    const hermezWalletAddress = hermezWallet?.hermezEthereumAddress;
+    setHermezWalletAddress(hermezWalletAddress);
+
+    // TODO: Get the available wallets
+
+    // Generate proofs locally
+
+    // Store payloads locally
+
+    // Aggregate proofs
+  };
+
+  const signPayload = async () => {
+  };
+
+  const submitResults = async (pid: string, hWallets: any[]) => {
+    // TODO: sign/vote with the available wallets
+
+    // TODO: Aggregate the results
+
+    // TODO: Submit the results
+    /*
+    const tx = await contract.functions.publishResult(
+      receiptsRoot,
+      result,
+      nVotes,
+      a, b, c
+    );
+
+    await tx.wait();
+
+    alert("Created");
+    */
   };
 
   return (
@@ -80,26 +149,54 @@ const Index: FC = () => {
           >
           </iframe>
 
-          <div style={{ height: 50 }} />
+          <VSpace />
+          <VSpace />
           <label>
-            <input type="checkbox" name="accept" value="true" />
+            <input
+              type="checkbox"
+              checked={charterAccepted}
+              onChange={() => setCharterAccepted(!charterAccepted)}
+            />
             &nbsp; I have read and accept the terms outlined above by joining
             the Aragon DAO
           </label>
-          <div style={{ height: 30 }} />
+          <VSpace />
 
-          {!account && <button onClick={connect}>Connect</button>}
-          {account && <p>Account: {account}</p>}
+          <If condition={charterAccepted}>
+            <Then>
+              <If condition={account}>
+                <Then>
+                  <p>Account: {account}</p>
+                </Then>
+                <Else>
+                  <button onClick={connectWallet}>Connect</button>
+                </Else>
+              </If>
 
-          <div style={{ height: 30 }} />
+              <VSpace />
 
-          {(provider && account) &&
-            <button onClick={setHermezAddress}>Sign Charter</button>}
-          {hermezWalletAddress && <p>Hermez address: {hermezWalletAddress}</p>}
+              <When condition={provider && account}>
+                <div style={{ textAlign: "center" }}>
+                  <button onClick={() => handleVote(true)}>VOTE YES</button>
+                  <HSpace />
+                  <button onClick={() => handleVote(false)}>VOTE NO</button>
+
+                  <When condition={hermezWalletAddress}>
+                    <p>Hermez address: {hermezWalletAddress}</p>
+                  </When>
+
+                  <VSpace />
+                </div>
+              </When>
+            </Then>
+          </If>
         </main>
       </div>
     </>
   );
 };
+
+const VSpace = () => <div style={{ height: 30 }} />;
+const HSpace = () => <span style={{ marginLeft: 20 }} />;
 
 export default Index;
