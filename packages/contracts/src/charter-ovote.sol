@@ -1,24 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.10;
 
-// charterovote contract.
-// For LICENSE check https://github.com/luisivan/charter-ovote/LICENSE
+import './verifier.sol';
+
+
+// Charter-OAV (OnchainAnonymousVoting) contract.
+// Fork from https://github.com/aragonzkresearch/ovote/tree/main/contracts
 // WARNING: This code is WIP, in early stages.
 /// @title charterovote
 /// @author Aragon  
-contract charterovote {
+contract CharterOVOTE {
+	SNARKVerifier    Verifier;
+
 	struct Process {
 		address creator; // the sender of the tx that created the process
 		uint256 transactionHash;
 		uint256 censusRoot;
+		uint256 charterHash;
 
 		// next 7 values are grouped and they use 217 bits, so they fit
 		// in a single 256 storage slot
-		uint64 censusSize;
 		uint64 resPubStartBlock; // results publishing start block
 		uint64 resPubWindow; // results publishing window
 		uint8 minParticipation; // number of votes
-		uint8 typ; // type of process, 0: multisig, 1: referendum
 		bool closed;
 	}
 	struct Result {
@@ -37,20 +41,23 @@ contract charterovote {
 	// Events used to synchronize the ovote-node when scanning the blocks
 
 	event EventProcessCreated(address creator, uint256 id, uint256
-				  transactionHash,  uint256 censusRoot, uint64
-				  censusSize, uint64 resPubStartBlock, uint64
-				  resPubWindow, uint8 minParticipation, uint8
-				  typ);
+				  transactionHash,  uint256 censusRoot, uint256 charterHash, uint64 resPubStartBlock, uint64
+				  resPubWindow, uint8 minParticipation);
 
-	event EventResultPublished(address publisher, uint256 id, uint256
-				   receiptsRoot, uint64 result, uint64 nVotes);
+	event EventVote(address publisher, uint256 id, uint256
+				   votevalue, uint64 weight);
 
 	event EventProcessClosed(address caller, uint256 id, bool success);
+
+	constructor( address _verifierContractAddr) public {
+		verifier = SNARKVerifier(_verifierContractAddr);
+	}
+
 
 	/// @notice stores a new Process into the processes mapping
 	/// @param transactionHash keccak256 hash of the transaction that will be executed if the process succeeds
 	/// @param censusRoot MerkleRoot of the CensusTree used for the process, which will be used to verify the zkSNARK proofs of the results
-	/// @param censusSize Number of leaves in the CensusTree used for the process
+	/// @param charterHash Number of leaves in the CensusTree used for the process
 	/// @param resPubStartBlock Block number where the results publishing phase starts
 	/// @param resPubWindow Window of time (in number of blocks) of the results publishing phase
 	/// @param minParticipation Threshold of minimum number of votes over the total users in the census (over CensusSize)
@@ -58,25 +65,22 @@ contract charterovote {
 	function newProcess(
 		uint256 transactionHash,
 		uint256 censusRoot,
-		uint64 censusSize,
+		uint256 charterHash,
 		uint64 resPubStartBlock,
 		uint64 resPubWindow,
-		uint8 minParticipation,
-		uint8 typ
+		uint8 minParticipation
 	) public returns (uint256) {
-		require(typ<=1, "typ must be 0 or 1");
-
 		processes[lastProcessID +1] = Process(msg.sender, transactionHash,
-				censusRoot, censusSize, resPubStartBlock, resPubWindow,
-				minParticipation, typ, false);
+				censusRoot, charterHash, resPubStartBlock, resPubWindow,
+				minParticipation, false);
 
 		// assume that we use solidity versiont >=0.8, which prevents
 		// overflow with normal addition
 		lastProcessID += 1;
 
 		emit EventProcessCreated(msg.sender, lastProcessID, transactionHash,
-					 censusRoot, censusSize, resPubStartBlock,
-					 resPubWindow, minParticipation, typ);
+					 censusRoot, charterHash, resPubStartBlock,
+					 resPubWindow, minParticipation);
 
 		return lastProcessID;
 	}
@@ -84,17 +88,17 @@ contract charterovote {
 	/// @notice validates the proposed result during the results-publishing
 	/// phase, and if it is valid, it stores it for the process id
 	/// @param id Process id
-	/// @param receiptsRoot The MerkleRoot of the tree built from of included voters
-	/// @param result The proposed result
-	/// @param nVotes The number of votes included in the result
+	/// @param nullifier wip
+	/// @param votevalue wip
+	/// @param weight wip
 	// /// @param a Groth16 proof G1 point
 	// /// @param b Groth16 proof G2 point
 	// /// @param c Groth16 proof G1 point
-	function publishResult(uint256 id,
-		uint256 receiptsRoot,
-		uint64 result,
-		uint64 nVotes
-    uint[2] memory a, uint[2][2] memory b, uint[2] memory c
+	function vote(uint256 id,
+		uint256 nullifier,
+		uint64 votevalue,
+		uint64 weight,
+		uint[2] memory a, uint[2][2] memory b, uint[2] memory c
         ) public {
 		// check that id has a process
 		require(id<=lastProcessID, "process id does not exist");
@@ -110,34 +114,28 @@ contract charterovote {
 		require(block.number < processes[id].resPubStartBlock + processes[id].resPubWindow,
 			"nVotes < process.resPubStartBlock + process.resPubWindow");
 
-		// check that nVotes <= process.censusSize
-		require(nVotes <= processes[id].censusSize,
-			"nVotes <= processes[id].censusSize");
+		// TODO check that the nullifier has not been already used
+		// TODO store the nullifier
 
-    // TODO build inputs array (using Process parameters from processes mapping)
-    // TODO call zk snark verification here when ready!!!
+		// build inputs array (using Process parameters from processes mapping)
+		uint256[6] memory inputs = [
+			42, // TODO chainid
+			id,
+			process[id].censusRoot,
+			weight,
+			nullifier,
+			votevalue,
+			process[id].charterHash
+		];
+		// call zk snark verification here when ready
+		require(verifier.verifyProof(a, b, c, inputs), "zkProof vote could not be verified");
 
-		// note: for the moment the next checks are done in the contract
-		require(nVotes <= process.censusSize,
-			"nVotes <= process.censusSize");
-		require(nVotes > process.minParticipation,
-			"nVotes > process.minParticipation %");
 
 
-		if (process.typ==1) { // referendum type
-			require(nVotes > results[id].nVotes,
-				"nVotes > results[id].nVotes");
+		emit EventVote(msg.sender, id, votevalue, weight);
 
-			// Result memory result;
-			results[id] = Result(msg.sender, receiptsRoot, result, nVotes);
-		}
-
-		emit EventResultPublished(msg.sender, id, receiptsRoot, result, nVotes);
-
-		if (process.typ==0) {
-			process.closed = true;
-			emit EventProcessClosed(msg.sender, id, true);
-		}
+		process.closed = true;
+		emit EventProcessClosed(msg.sender, id, true);
 	}
 
 	// @notice closes the process for the given id
@@ -147,7 +145,6 @@ contract charterovote {
 		Process storage process = processes[id];
 
 		require(process.closed == false, "process already closed");
-		require(process.typ == 1, "can not close multisig type, is closed through publishResult call");
 
 		// get result by process id
 		Result storage result;
