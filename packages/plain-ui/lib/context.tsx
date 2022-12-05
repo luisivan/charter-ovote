@@ -5,15 +5,16 @@ import {
   buildCensus,
   generateWallets,
   generateZkProof,
-  getProof,
+  getCharterHash,
   MerkleTree,
+  newProposal,
+  vote,
 } from "./logic";
 
 const BASE_STRING =
   "This message will be used to generate derived Baby JubJub wallets";
-const CHARTER_CONTENT = "This is a charter";
+const CHARTER_CONTENT = "I accept the Aragon Charter";
 const CHAIN_ID = 5;
-const PROPOSAL_ID = BigInt(0);
 const VOTE = 1;
 
 // Exported types and data models
@@ -35,12 +36,11 @@ export enum FormSteps {
   CONNECTING_WALLET = 1,
   GENERATE_BJJ_WALLETS = 2,
   GENERATING_BJJ_WALLETS = 3,
-  SET_CENSUS_ROOT = 4,
-  SETTING_CENSUS_ROOT = 5,
   COMPUTE_VOTE_PROOF = 6,
   COMPUTING_VOTE_PROOF = 7,
   SUBMITTING_VOTE = 8,
-  RESULT = 9,
+  SUCCESS = 9,
+  FAILURE = 10,
 }
 
 const UiContext = createContext<UiContext>({
@@ -134,28 +134,49 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
     setWallets(bjjWallets);
     setCensustree(census);
 
-    // setStep(FormSteps.SET_CENSUS_ROOT);
-    // TODO: UNDO HERE
     setStep(FormSteps.COMPUTE_VOTE_PROOF);
   };
 
   const submitVote = async () => {
+    if (!provider) throw new Error("Not connected");
+
     // Get proof
     const voterIdx = 0;
     const myWallet = wallets[voterIdx];
 
+    const charterHash = getCharterHash(CHARTER_CONTENT);
+
+    console.log("Creating proposal");
+    const proposalId = await newProposal(censusTree, charterHash, provider);
+
+    // ZK Proof
     const zkProof = await generateZkProof(
       CHAIN_ID,
-      PROPOSAL_ID,
+      proposalId,
       censusTree,
       VOTE,
       CHARTER_CONTENT,
       voterIdx,
       myWallet,
     );
-
     const { proof, publicSignals } = zkProof;
-    console.log(zkProof);
+
+    console.log(proof);
+
+    setStep(FormSteps.SUBMITTING_VOTE);
+
+    // Voting
+    const success = await vote(
+      CHAIN_ID,
+      proposalId,
+      VOTE,
+      provider,
+      myWallet,
+      proof,
+    );
+    if (!success) return setStep(FormSteps.FAILURE);
+
+    setStep(FormSteps.SUCCESS);
   };
 
   const value: UiContext = {

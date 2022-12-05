@@ -50,18 +50,16 @@ const FormStepMux: FC = () => {
       return <StepGenerateBabyJubJubWallets />;
     case FormSteps.GENERATING_BJJ_WALLETS:
       return <StepGeneratingBabyJubJubWallets />;
-    case FormSteps.SET_CENSUS_ROOT:
-      return <p>(not implemented)</p>;
-    case FormSteps.SETTING_CENSUS_ROOT:
-      return <p>(not implemented)</p>;
     case FormSteps.COMPUTE_VOTE_PROOF:
       return <StepComputeVote />;
     case FormSteps.COMPUTING_VOTE_PROOF:
       return <StepComputingVoteProof />;
     case FormSteps.SUBMITTING_VOTE:
-      return <p>(not implemented)</p>;
-    case FormSteps.RESULT:
-      return <p>Success</p>;
+      return <StepSubmittingVote />;
+    case FormSteps.SUCCESS:
+      return <StepSuccess />;
+    case FormSteps.FAILURE:
+      return <StepFailure />;
   }
 
   return <p>(not implemented)</p>;
@@ -141,13 +139,16 @@ const StepComputeVote: FC = () => {
 };
 
 const StepComputingVoteProof: FC = () => {
-  return (
-    <>
-      <p>
-        Generating the vote proof, please wait...
-      </p>
-    </>
-  );
+  return <p>Generating the vote proof, please wait...</p>;
+};
+const StepSubmittingVote: FC = () => {
+  return <p>Submitting your vote, please wait...</p>;
+};
+const StepSuccess: FC = () => {
+  return <p>Your vote has been validated successfully!</p>;
+};
+const StepFailure: FC = () => {
+  return <p>Your vote could not be delivered</p>;
 };
 
 const VSpace = () => <div style={{ height: 30 }} />;

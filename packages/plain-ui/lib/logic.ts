@@ -1,9 +1,9 @@
-import { Contract, providers, utils, Wallet } from "ethers";
+import { Contract, providers, utils } from "ethers";
 import { toUtf8Bytes } from "ethers/lib/utils";
 import { ABI } from "../lib/constants";
 
-// TODO: Set the right value
-const CONTRACT_ADDRESS = "0x1234";
+// const VERIFIER_CONTRACT = "0xd8b867f74c236e645a2984f8b0a1854a12c36cc6";
+const VOTING_CONTRACT = "0xf4ef16da1f057ffdebd9474e336d851fce8f8f0d";
 const CIRCUIT_WASM_URL = "/static/circuit.wasm";
 const CIRCUIT_ZKEY_URL = "/static/circuit.zkey";
 
@@ -16,6 +16,11 @@ export type PublicKey = [Uint8Array, Uint8Array];
 export type BjjWallet = { sk: SecretKey; pubK: PublicKey };
 export type Signature = { R8: [Uint8Array, Uint8Array]; S: bigint };
 export type MerkleTree = any;
+export type ZkProof = {
+  pi_a: [bigint, bigint];
+  pi_b: [[bigint, bigint], [bigint, bigint]];
+  pi_c: [bigint, bigint];
+};
 
 let JsBundle: any = {};
 let newMemEmptyTrie: Function,
@@ -50,11 +55,6 @@ if (typeof window !== "undefined") {
   }).catch((err: any) => {
     alert("Could not load the bundle dependencies: " + err?.message);
   });
-}
-
-function getConnectedContract(provider: providers.Web3Provider): Contract {
-  const contract = new Contract(CONTRACT_ADDRESS, ABI, provider.getSigner());
-  return contract.connect(provider);
 }
 
 export function generateWallets(seed: string): BjjWallet[] {
@@ -193,8 +193,6 @@ export async function generateZkProof(
   const proverWasm = await fetchProver();
   const zKey = await fetchZkey();
 
-  debugger;
-
   const { proof, publicSignals }: { proof: any; publicSignals: any } =
     await groth16FullProve(
       inputs,
@@ -210,7 +208,49 @@ export async function generateZkProof(
   return { proof, publicSignals };
 }
 
-export function verify() {
+export async function newProposal(
+  censusTree: MerkleTree,
+  charterHash: bigint,
+  provider: providers.Web3Provider,
+) {
+  const contract = getVotingContract(provider);
+
+  const tx = await contract.functions.newProcess(censusTree.root, charterHash);
+  const receipt = await tx.wait();
+
+  // EventProcessCreated
+  const event = receipt.logs[0];
+  const data = event.data.substr(66, 64);
+  const proposalId = BigInt("0x" + data);
+
+  return proposalId;
+}
+
+export async function vote(
+  chainId: number,
+  proposalId: bigint,
+  voteValue: number,
+  provider: providers.Web3Provider,
+  wallet: BjjWallet,
+  proof: ZkProof,
+) {
+  const contract = getVotingContract(provider);
+
+  // Compute nullifier
+  const nullifier = getNullifier(chainId, proposalId, wallet);
+
+  const tx = await contract.functions.vote(
+    proposalId,
+    nullifier,
+    voteValue,
+    VOTE_WEIGHT,
+    proof.pi_a,
+    proof.pi_b,
+    proof.pi_c,
+  );
+  const receipt = await tx.wait();
+
+  return receipt.logs?.length >= 1;
 }
 
 export function getNullifier(
@@ -289,6 +329,10 @@ export function fetchZkey() {
     .then((buff) => new Uint8Array(buff));
 }
 
+function getVotingContract(provider: providers.Web3Provider): Contract {
+  return new Contract(VOTING_CONTRACT, ABI, provider.getSigner());
+}
+
 function bufferToBigInt(bytes: Buffer | Uint8Array): bigint {
   // Ensure that it is a buffer
   bytes = Buffer.from(bytes);
@@ -325,77 +369,3 @@ function with0x(value: string): string {
 function without0x(value: string): string {
   return value.startsWith("0x") ? value.substring(2) : value;
 }
-
-/*
-export const newVote = async (provider: providers.Web3Provider) => {
-  if (!provider) return alert("Not connected");
-
-  const contract = getConnectedContract(provider);
-
-  // TODO: create several wallets
-  const hWallet = await getHermezWallet();
-
-  // TODO: generate census
-
-  // TODO: send create vote TX
-
-  const tx = await contract.functions.newProcess(
-    txHash,
-    censusRoot,
-    censusSize,
-    resPubStartBlock,
-    resPubWindow,
-    minParticipation,
-    typ,
-  );
-
-  await tx.wait();
-
-  alert("Created");
-};
-
-export const handleVote = async (approveValue: boolean) => {
-  if (!provider || !account) return alert("Not connected");
-
-  const hermezWallet = await getHermezWallet();
-  const hermezWalletAddress = hermezWallet?.hermezEthereumAddress;
-  setHermezWalletAddress(hermezWalletAddress);
-
-  // TODO: Get the available wallets
-
-  // Generate proofs locally
-
-  // Store payloads locally
-
-  // Aggregate proofs
-};
-
-const submitResults = async (pid: string, hWallets: any[]) => {
-  // TODO: sign/vote with the available wallets
-
-  // TODO: Aggregate the results
-
-  // TODO: Submit the results
-  const tx = await contract.functions.publishResult(
-    receiptsRoot,
-    result,
-    nVotes,
-    a,
-    b,
-    c,
-  );
-
-  await tx.wait();
-
-  alert("Created");
-};
-
-const getHermezWallet = async function (provider: providers.JsonRpcProvider) {
-  if (!provider) return alert("Not connected");
-
-  const signer = provider.getSigner();
-  return HermezWallet.createWalletFromEtherAccount(
-    signer,
-  );
-};
-*/
