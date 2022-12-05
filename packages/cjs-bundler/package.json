@@ -6,7 +6,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "circomlibjs": "^0.1.7"
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.5.0"
   },
   "devDependencies": {
     "browserify": "^17.0.0"

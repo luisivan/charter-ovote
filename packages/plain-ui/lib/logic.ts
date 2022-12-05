@@ -4,13 +4,12 @@ import { ABI } from "../lib/constants";
 
 // TODO: Set the right value
 const CONTRACT_ADDRESS = "0x1234";
-const CIRCUIT_WASM_URL =
-  "https://github.com/luisivan/charter-ovote/raw/main/packages/trustedsetup/ts-dev/dev/128/circuit.wasm";
-const CIRCUIT_ZKEY_URL =
-  "https://github.com/luisivan/charter-ovote/blob/main/packages/trustedsetup/ts-dev/dev/128/circuit.zkey";
+const CIRCUIT_WASM_URL = "/static/circuit.wasm";
+const CIRCUIT_ZKEY_URL = "/static/circuit.zkey";
 
 const CIRCOM_CIRCUIT_LEVEL_COUNT = 7; // not used here
 const CIRCUIT_LEVEL_COUNT = CIRCOM_CIRCUIT_LEVEL_COUNT + 1;
+const VOTE_WEIGHT = 1;
 
 export type SecretKey = Uint8Array;
 export type PublicKey = [Uint8Array, Uint8Array];
@@ -21,7 +20,10 @@ export type MerkleTree = any;
 let JsBundle: any = {};
 let newMemEmptyTrie: Function,
   buildEddsa: Function,
-  buildPoseidonReference: Function;
+  buildPoseidonReference: Function,
+  groth16FullProve: Function,
+  groth16Verify: Function,
+  zKeyExportVerificationKey: Function;
 let eddsa: any, poseidon: ((p: any) => Uint8Array) | any;
 
 if (typeof window !== "undefined") {
@@ -34,6 +36,9 @@ if (typeof window !== "undefined") {
   newMemEmptyTrie = JsBundle.newMemEmptyTrie;
   buildEddsa = JsBundle.buildEddsa;
   buildPoseidonReference = JsBundle.buildPoseidonReference;
+  groth16FullProve = JsBundle?.groth16?.fullProve;
+  groth16Verify = JsBundle?.groth16?.verify;
+  zKeyExportVerificationKey = JsBundle?.zKey?.exportVerificationKey;
 
   // Load circomlibjs artifacts
   buildEddsa().then((result: any) => {
@@ -76,12 +81,11 @@ export async function buildCensus(wallets: BjjWallet[]): Promise<MerkleTree> {
   else if (!wallets?.length) throw new Error("Empty census");
 
   // build the census tree add public keys to the tree
-  let weight = 1;
   const tree = await newMemEmptyTrie();
 
   for (let i = 0; i < wallets.length; i++) {
     const w = wallets[i];
-    const leaf = poseidon([w.pubK[0], w.pubK[1], weight]);
+    const leaf = poseidon([w.pubK[0], w.pubK[1], VOTE_WEIGHT]);
     await tree.insert(i, leaf);
   }
   return tree;
@@ -89,7 +93,7 @@ export async function buildCensus(wallets: BjjWallet[]): Promise<MerkleTree> {
 
 export async function getProof(
   censusTree: MerkleTree,
-  index: number,
+  walletIndex: number,
 ): Promise<string[]> {
   if (!poseidon?.F) {
     throw new Error("The Poseidon dependencies are not available");
@@ -100,7 +104,7 @@ export async function getProof(
   const F = poseidon.F;
 
   // voter gets the siblings (merkleproof)
-  const res = await censusTree.find(index);
+  const res = await censusTree.find(walletIndex);
 
   if (!res.found) throw new Error("Index not found");
 
@@ -118,29 +122,99 @@ export function getCharterHash(contents: string): bigint {
   const hexHash = utils.keccak256(toUtf8Bytes(contents));
   const bytes = hexToBytes(hexHash);
   const hash = bufferToBigInt(bytes);
-  return hash % (BigInt(1) << BigInt(253));
 
-  // return BigInt("1234567890123456789");
+  // FIXME: hash properly
+  return hash % (BigInt(1) << BigInt(251));
 }
 
 export function getVoteSignature(
   voteValue: number,
-  charterContent: string,
+  charterHash: bigint,
   wallet: BjjWallet,
 ): Signature {
   if (!poseidon) throw new Error("The Poseidon dependencies are not available");
   else if (!eddsa) throw new Error("The EDDSA dependencies are not available");
-  else if (!charterContent) throw new Error("The charter cannot be empty");
-
-  const charterHash = getCharterHash(charterContent);
+  else if (!charterHash) throw new Error("The hash cannot be empty");
 
   // user signs vote & charter
   const toSign = poseidon([voteValue, charterHash]);
   return eddsa.signPoseidon(wallet.sk, toSign);
 }
 
+export async function generateZkProof(
+  chainId: number,
+  proposalId: bigint,
+  censusTree: MerkleTree,
+  vote: number,
+  charterContent: string,
+  voterIndex: number,
+  wallet: BjjWallet,
+) {
+  if (!poseidon?.F) {
+    throw new Error("The Poseidon dependencies are not available");
+  } else if (!groth16FullProve) {
+    throw new Error("The prover dependencies are not available");
+  } else if (!censusTree) {
+    throw new Error("The census is empty");
+  }
+
+  const F = poseidon.F;
+
+  // Generate signature over vote + charter hash
+  const charterHash = getCharterHash(charterContent);
+  const signature = getVoteSignature(vote, charterHash, wallet);
+
+  // Compute nullifier
+  const nullifier = getNullifier(chainId, proposalId, wallet);
+
+  const censusProof = await getProof(censusTree, voterIndex);
+
+  const inputs = {
+    // public inputs
+    chainID: chainId,
+    processID: proposalId,
+    censusRoot: F.toObject(censusTree.root).toString(),
+    weight: VOTE_WEIGHT,
+    nullifier: F.toObject(nullifier).toString(),
+    vote: BigInt(vote),
+    charterHash,
+    // private inputs
+    index: voterIndex,
+    pubKx: F.toObject(wallet.pubK[0]).toString(),
+    pubKy: F.toObject(wallet.pubK[1]).toString(),
+    s: signature.S,
+    rx: F.toObject(signature.R8[0]).toString(),
+    ry: F.toObject(signature.R8[1]).toString(),
+    siblings: censusProof,
+  };
+
+  // Fetch the proving circuit
+  // const prover = await fetchProverModule();
+  const proverWasm = await fetchProver();
+  const zKey = await fetchZkey();
+
+  debugger;
+
+  const { proof, publicSignals }: { proof: any; publicSignals: any } =
+    await groth16FullProve(
+      inputs,
+      proverWasm,
+      zKey,
+      null,
+    );
+
+  const vKey = await zKeyExportVerificationKey(zKey);
+  const isValid = await groth16Verify(vKey, publicSignals, proof);
+  if (!isValid) throw new Error("The generated proof is not valid");
+
+  return { proof, publicSignals };
+}
+
+export function verify() {
+}
+
 export function getNullifier(
-  chainId: 0,
+  chainId: number,
   proposalId: bigint,
   wallet: BjjWallet,
 ): Uint8Array {
@@ -154,9 +228,14 @@ export function getNullifier(
 
 // HELPERS
 
+export async function fetchProver() {
+  return fetch(CIRCUIT_WASM_URL)
+    .then((res) => res.arrayBuffer())
+    .then((res) => new Uint8Array(res));
+}
+
 export async function fetchProverModule() {
-  const wasmBytes = await fetch(CIRCUIT_WASM_URL)
-    .then((res) => res.arrayBuffer());
+  const wasmBytes = await fetchProver();
 
   const instance = await WebAssembly.instantiate(wasmBytes, {
     runtime: {
@@ -187,6 +266,8 @@ export async function fetchProverModule() {
       showSharedRWMemory: () => {},
     },
   });
+
+  return instance;
 
   function getMessage() {
     const getMessageChar = ((instance as any)?.exports as any).getMessageChar;

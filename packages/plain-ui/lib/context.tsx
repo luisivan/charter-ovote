@@ -3,20 +3,18 @@ import { providers } from "ethers";
 import {
   BjjWallet,
   buildCensus,
-  fetchProverModule,
-  fetchZkey,
   generateWallets,
-  getNullifier,
+  generateZkProof,
   getProof,
-  getVoteSignature,
   MerkleTree,
 } from "./logic";
 
 const BASE_STRING =
   "This message will be used to generate derived Baby JubJub wallets";
 const CHARTER_CONTENT = "This is a charter";
-const CHAIN_ID = 0;
+const CHAIN_ID = 5;
 const PROPOSAL_ID = BigInt(0);
+const VOTE = 1;
 
 // Exported types and data models
 type UiContext = {
@@ -145,18 +143,19 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
     // Get proof
     const voterIdx = 0;
     const myWallet = wallets[voterIdx];
-    const myProof = await getProof(censusTree, voterIdx);
 
-    // Generate signature over vote + charter hash
-    const myVote = 1;
-    const signature = getVoteSignature(myVote, CHARTER_CONTENT, myWallet);
+    const zkProof = await generateZkProof(
+      CHAIN_ID,
+      PROPOSAL_ID,
+      censusTree,
+      VOTE,
+      CHARTER_CONTENT,
+      voterIdx,
+      myWallet,
+    );
 
-    // Compute nullifier
-    const nullifier = getNullifier(CHAIN_ID, PROPOSAL_ID, myWallet);
-
-    // Fetch the proving circuit
-    const prover = await fetchProverModule();
-    const zKey = await fetchZkey();
+    const { proof, publicSignals } = zkProof;
+    console.log(zkProof);
   };
 
   const value: UiContext = {

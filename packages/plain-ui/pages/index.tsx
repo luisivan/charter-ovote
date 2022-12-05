@@ -1,7 +1,6 @@
 import { FC } from "react";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
-import { Else, If, Then, When } from "react-if";
 import { FormSteps, UiContextProvider, useUiContext } from "../lib/context";
 
 const Index: FC = () => {
@@ -40,13 +39,7 @@ const Index: FC = () => {
 };
 
 const FormStepMux: FC = () => {
-  const {
-    step,
-    provider,
-    signerAddress,
-    charterAccepted,
-    methods,
-  } = useUiContext();
+  const { step } = useUiContext();
 
   switch (step) {
     case FormSteps.ACCEPT_CHARTER:
@@ -64,52 +57,14 @@ const FormStepMux: FC = () => {
     case FormSteps.COMPUTE_VOTE_PROOF:
       return <StepComputeVote />;
     case FormSteps.COMPUTING_VOTE_PROOF:
-      return <p>(not implemented)</p>;
+      return <StepComputingVoteProof />;
     case FormSteps.SUBMITTING_VOTE:
       return <p>(not implemented)</p>;
     case FormSteps.RESULT:
       return <p>Success</p>;
-    default:
-      return <p>(not implemented)</p>;
   }
 
-  return (
-    <>
-      <If condition={charterAccepted}>
-        <Then>
-          <If condition={signerAddress}>
-            <Then>
-              <p>
-                Connected with: <code>{signerAddress}</code>
-              </p>
-            </Then>
-            <Else>
-              <button onClick={methods.nextStep}>Connect wallet</button>
-            </Else>
-          </If>
-
-          <VSpace />
-
-          <When condition={provider && signerAddress}>
-            <div style={{ textAlign: "center" }}>
-              {
-                /* <button onClick={() => handleVote(true)}>VOTE YES</button>
-              <HSpace />
-              <button onClick={() => handleVote(false)}>VOTE NO</button>
-
-              <When condition={hermezWalletAddress}>
-                <p>Hermez address: {hermezWalletAddress}</p>
-              </When>
-
-              <VSpace />
-                */
-              }
-            </div>
-          </When>
-        </Then>
-      </If>
-    </>
-  );
+  return <p>(not implemented)</p>;
 };
 
 const StepAccept: FC = () => {
@@ -181,6 +136,16 @@ const StepComputeVote: FC = () => {
       <VSpace />
 
       <button onClick={methods.nextStep}>Continue</button>
+    </>
+  );
+};
+
+const StepComputingVoteProof: FC = () => {
+  return (
+    <>
+      <p>
+        Generating the vote proof, please wait...
+      </p>
     </>
   );
 };
