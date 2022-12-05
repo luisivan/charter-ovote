@@ -1,9 +1,18 @@
 import { createContext, ReactNode, useContext, useState } from "react";
 import { providers } from "ethers";
-import { generateBabyJubJubSkArray } from "./logic";
+import {
+  buildCensus,
+  generateWallets,
+  getNullifier,
+  getProof,
+  getVoteSignature,
+} from "./logic";
 
 const BASE_STRING =
   "This message will be used to generate derived Baby JubJub wallets";
+const CHARTER_CONTENT = "This is a charter";
+const CHAIN_ID = 0;
+const PROPOSAL_ID = BigInt(0);
 
 // Exported types and data models
 type UiContext = {
@@ -98,8 +107,28 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
     // Generate 5 wallets by signing one message and deriving new keys
     if (!signer) throw new Error("Not connected");
 
-    const signature = await signer.signMessage(BASE_STRING);
-    const wallets = generateBabyJubJubSkArray(signature);
+    // Generate wallets
+    const seedText = await signer.signMessage(BASE_STRING);
+    const bjjWallets = generateWallets(seedText);
+
+    // Build census
+    const censusTree = await buildCensus(bjjWallets);
+
+    // Get proof
+    const voterIdx = 0;
+    const myWallet = bjjWallets[voterIdx];
+    const myProof = await getProof(censusTree, voterIdx);
+
+    debugger;
+
+    // Generate signature over vote + charter hash
+    const myVote = 1;
+    const signature = getVoteSignature(myVote, CHARTER_CONTENT, myWallet);
+
+    // Compute nullifier
+    const nullifier = getNullifier(CHAIN_ID, PROPOSAL_ID, myWallet);
+
+    //
   };
 
   const value: UiContext = {
