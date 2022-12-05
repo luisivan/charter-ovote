@@ -1,11 +1,15 @@
 import { createContext, ReactNode, useContext, useState } from "react";
 import { providers } from "ethers";
 import {
+  BjjWallet,
   buildCensus,
+  fetchProverModule,
+  fetchZkey,
   generateWallets,
   getNullifier,
   getProof,
   getVoteSignature,
+  MerkleTree,
 } from "./logic";
 
 const BASE_STRING =
@@ -20,6 +24,7 @@ type UiContext = {
   provider?: providers.Web3Provider;
   signer?: providers.JsonRpcSigner;
   signerAddress: string;
+
   charterAccepted: boolean;
   methods: {
     nextStep: () => void;
@@ -32,10 +37,12 @@ export enum FormSteps {
   CONNECTING_WALLET = 1,
   GENERATE_BJJ_WALLETS = 2,
   GENERATING_BJJ_WALLETS = 3,
-  SEND_CENSUS_ROOT = 4,
-  COMPUTE_VOTE_PROOF = 5,
-  SUBMIT_VOTE_PROOF = 6,
-  RESULT = 7,
+  SET_CENSUS_ROOT = 4,
+  SETTING_CENSUS_ROOT = 5,
+  COMPUTE_VOTE_PROOF = 6,
+  COMPUTING_VOTE_PROOF = 7,
+  SUBMITTING_VOTE = 8,
+  RESULT = 9,
 }
 
 const UiContext = createContext<UiContext>({
@@ -51,12 +58,18 @@ const UiContext = createContext<UiContext>({
 });
 
 export function UiContextProvider({ children }: { children: ReactNode }) {
+  // Exposed
   const [step, setStep] = useState(FormSteps.ACCEPT_CHARTER);
   const [provider, setProvider] = useState<providers.Web3Provider>();
   const [signer, setSigner] = useState<providers.JsonRpcSigner>();
   const [signerAddress, setSignerAddress] = useState<string>("");
   const [charterAccepted, setCharterAccepted] = useState(false);
 
+  // Not exposed
+  const [wallets, setWallets] = useState<BjjWallet[]>([]);
+  const [censusTree, setCensustree] = useState<MerkleTree>();
+
+  // Methods
   const nextStep = async () => {
     if (step === FormSteps.ACCEPT_CHARTER) {
       if (!charterAccepted) {
@@ -70,7 +83,12 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
       setStep(FormSteps.GENERATING_BJJ_WALLETS);
 
       // Generate wallets after UI painted
-      Promise.resolve().then(() => generateHezWallets());
+      Promise.resolve().then(() => generateBjjWallets());
+    } else if (step === FormSteps.COMPUTE_VOTE_PROOF) {
+      setStep(FormSteps.COMPUTING_VOTE_PROOF);
+
+      // Generate a vote proof and submit it on-chain
+      Promise.resolve().then(() => submitVote());
     } else {
       alert("An unexpected internal error occurred");
     }
@@ -103,7 +121,7 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const generateHezWallets = async () => {
+  const generateBjjWallets = async () => {
     // Generate 5 wallets by signing one message and deriving new keys
     if (!signer) throw new Error("Not connected");
 
@@ -112,14 +130,22 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
     const bjjWallets = generateWallets(seedText);
 
     // Build census
-    const censusTree = await buildCensus(bjjWallets);
+    const census = await buildCensus(bjjWallets);
+    if (!census) throw new Error("Could not compute the census");
 
+    setWallets(bjjWallets);
+    setCensustree(census);
+
+    // setStep(FormSteps.SET_CENSUS_ROOT);
+    // TODO: UNDO HERE
+    setStep(FormSteps.COMPUTE_VOTE_PROOF);
+  };
+
+  const submitVote = async () => {
     // Get proof
     const voterIdx = 0;
-    const myWallet = bjjWallets[voterIdx];
+    const myWallet = wallets[voterIdx];
     const myProof = await getProof(censusTree, voterIdx);
-
-    debugger;
 
     // Generate signature over vote + charter hash
     const myVote = 1;
@@ -128,7 +154,9 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
     // Compute nullifier
     const nullifier = getNullifier(CHAIN_ID, PROPOSAL_ID, myWallet);
 
-    //
+    // Fetch the proving circuit
+    const prover = await fetchProverModule();
+    const zKey = await fetchZkey();
   };
 
   const value: UiContext = {

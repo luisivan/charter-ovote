@@ -57,6 +57,18 @@ const FormStepMux: FC = () => {
       return <StepGenerateBabyJubJubWallets />;
     case FormSteps.GENERATING_BJJ_WALLETS:
       return <StepGeneratingBabyJubJubWallets />;
+    case FormSteps.SET_CENSUS_ROOT:
+      return <p>(not implemented)</p>;
+    case FormSteps.SETTING_CENSUS_ROOT:
+      return <p>(not implemented)</p>;
+    case FormSteps.COMPUTE_VOTE_PROOF:
+      return <StepComputeVote />;
+    case FormSteps.COMPUTING_VOTE_PROOF:
+      return <p>(not implemented)</p>;
+    case FormSteps.SUBMITTING_VOTE:
+      return <p>(not implemented)</p>;
+    case FormSteps.RESULT:
+      return <p>Success</p>;
     default:
       return <p>(not implemented)</p>;
   }
@@ -152,6 +164,23 @@ const StepGeneratingBabyJubJubWallets: FC = () => {
       <p>
         Generating the wallets and creating the census, please wait...
       </p>
+    </>
+  );
+};
+
+const StepComputeVote: FC = () => {
+  const { methods } = useUiContext();
+
+  return (
+    <>
+      <p>
+        The census is created. You can finally compute your vote and submit it
+        on-chain.
+      </p>
+
+      <VSpace />
+
+      <button onClick={methods.nextStep}>Continue</button>
     </>
   );
 };

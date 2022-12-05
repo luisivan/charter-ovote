@@ -2,22 +2,27 @@ import { Contract, providers, utils, Wallet } from "ethers";
 import { toUtf8Bytes } from "ethers/lib/utils";
 import { ABI } from "../lib/constants";
 
-export type SecretKey = Uint8Array;
-export type PublicKey = [Uint8Array, Uint8Array];
-export type BjjWallet = { sk: SecretKey; pubK: PublicKey };
-export type MerkleTree = any;
-
 // TODO: Set the right value
 const CONTRACT_ADDRESS = "0x1234";
+const CIRCUIT_WASM_URL =
+  "https://github.com/luisivan/charter-ovote/raw/main/packages/trustedsetup/ts-dev/dev/128/circuit.wasm";
+const CIRCUIT_ZKEY_URL =
+  "https://github.com/luisivan/charter-ovote/blob/main/packages/trustedsetup/ts-dev/dev/128/circuit.zkey";
 
 const CIRCOM_CIRCUIT_LEVEL_COUNT = 7; // not used here
 const CIRCUIT_LEVEL_COUNT = CIRCOM_CIRCUIT_LEVEL_COUNT + 1;
 
+export type SecretKey = Uint8Array;
+export type PublicKey = [Uint8Array, Uint8Array];
+export type BjjWallet = { sk: SecretKey; pubK: PublicKey };
+export type Signature = { R8: [Uint8Array, Uint8Array]; S: bigint };
+export type MerkleTree = any;
+
 let JsBundle: any = {};
-let newMemEmptyTrie: any,
+let newMemEmptyTrie: Function,
   buildEddsa: Function,
   buildPoseidonReference: Function;
-let eddsa: any, poseidon: any;
+let eddsa: any, poseidon: ((p: any) => Uint8Array) | any;
 
 if (typeof window !== "undefined") {
   // Note: Dirty hack to access NodeJS-only Hermez library that only works bundled with through Browserify
@@ -83,25 +88,27 @@ export async function buildCensus(wallets: BjjWallet[]): Promise<MerkleTree> {
 }
 
 export async function getProof(
-  tree: MerkleTree,
+  censusTree: MerkleTree,
   index: number,
-): Promise<bigint[]> {
+): Promise<string[]> {
   if (!poseidon?.F) {
     throw new Error("The Poseidon dependencies are not available");
+  } else if (!censusTree) {
+    throw new Error("The census is empty");
   }
 
   const F = poseidon.F;
 
   // voter gets the siblings (merkleproof)
-  const res = await tree.find(index);
+  const res = await censusTree.find(index);
 
   if (!res.found) throw new Error("Index not found");
 
-  let siblings = res.siblings;
+  let siblings: string[] = res.siblings;
   for (let i = 0; i < siblings.length; i++) {
     siblings[i] = F.toObject(siblings[i]).toString();
   }
-  while (siblings.length < CIRCUIT_LEVEL_COUNT) siblings.push(0);
+  while (siblings.length < CIRCUIT_LEVEL_COUNT) siblings.push("0");
 
   return siblings;
 }
@@ -120,7 +127,7 @@ export function getVoteSignature(
   voteValue: number,
   charterContent: string,
   wallet: BjjWallet,
-) {
+): Signature {
   if (!poseidon) throw new Error("The Poseidon dependencies are not available");
   else if (!eddsa) throw new Error("The EDDSA dependencies are not available");
   else if (!charterContent) throw new Error("The charter cannot be empty");
@@ -136,7 +143,7 @@ export function getNullifier(
   chainId: 0,
   proposalId: bigint,
   wallet: BjjWallet,
-) {
+): Uint8Array {
   return poseidon([
     chainId,
     proposalId,
@@ -147,13 +154,73 @@ export function getNullifier(
 
 // HELPERS
 
-export function bufferToBigInt(bytes: Buffer | Uint8Array): bigint {
+export async function fetchProverModule() {
+  const wasmBytes = await fetch(CIRCUIT_WASM_URL)
+    .then((res) => res.arrayBuffer());
+
+  const instance = await WebAssembly.instantiate(wasmBytes, {
+    runtime: {
+      exceptionHandler: (code: number) => {
+        let errStr: string;
+        switch (code) {
+          case 1:
+            errStr = "Signal not found.";
+            break;
+          case 2:
+            errStr = "Too many signals set.";
+            break;
+          case 3:
+            errStr = "Signal already set.";
+            break;
+          case 4:
+            errStr = "Assert Failed.";
+            break;
+          case 5:
+            errStr = "Not enough memory.";
+            break;
+          default:
+            errStr = "Unknown error";
+            break;
+        }
+        throw new Error(errStr + " " + getMessage());
+      },
+      showSharedRWMemory: () => {},
+    },
+  });
+
+  function getMessage() {
+    const getMessageChar = ((instance as any)?.exports as any).getMessageChar;
+    if (!getMessageChar) return "";
+
+    let message = "";
+    let c = getMessageChar();
+    while (c != 0) {
+      message += String.fromCharCode(c);
+      c = getMessageChar();
+    }
+    return message;
+  }
+}
+
+export function fetchZkey() {
+  return fetch(CIRCUIT_ZKEY_URL)
+    .then((res) => res.arrayBuffer())
+    .then((buff) => new Uint8Array(buff));
+}
+
+function bufferToBigInt(bytes: Buffer | Uint8Array): bigint {
   // Ensure that it is a buffer
   bytes = Buffer.from(bytes);
   return BigInt(with0x(bytes.toString("hex")));
 }
 
-export function hexToBytes(hexString: string): Uint8Array {
+function bigIntToBuffer(number: bigint): Uint8Array {
+  let hexNumber = number.toString(16);
+  while (hexNumber.length < 64) hexNumber = "0" + hexNumber;
+  return hexToBytes(hexNumber);
+}
+
+function hexToBytes(hexString: string): Uint8Array {
   if (!/^(0x)?[0-9a-fA-F]+$/.test(hexString)) {
     throw new Error("Invalid hex string");
   } else if (hexString.length % 2 !== 0) {
@@ -170,11 +237,11 @@ export function hexToBytes(hexString: string): Uint8Array {
   return Uint8Array.from(bytes);
 }
 
-export function with0x(value: string): string {
+function with0x(value: string): string {
   return value.startsWith("0x") ? value : "0x" + value;
 }
 
-export function without0x(value: string): string {
+function without0x(value: string): string {
   return value.startsWith("0x") ? value.substring(2) : value;
 }
 
@@ -220,9 +287,6 @@ export const handleVote = async (approveValue: boolean) => {
   // Store payloads locally
 
   // Aggregate proofs
-};
-
-const signPayload = async () => {
 };
 
 const submitResults = async (pid: string, hWallets: any[]) => {
