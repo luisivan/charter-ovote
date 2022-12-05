@@ -1,132 +1,12 @@
-import { FC, useState } from "react";
+import { FC } from "react";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
-import { Contract, providers } from "ethers";
-import { ABI } from "../lib/constants";
 import { Else, If, Then, When } from "react-if";
-
-// TODO: Set the right value
-const CONTRACT_ADDRESS = "0x1234";
-
-let JsBundle: any = {};
-if (typeof window !== "undefined") {
-  // Note: Dirty hack to access NodeJS-only Hermez library that only works bundled with through Browserify
-  //       Will only work on browsers after the <script> tag is loaded
-  //       Real solution is to rewrite the zk libraries in pure JS that runs universally
-
-  // @ts-ignore
-  JsBundle = window.getBundle();
-}
+import { FormSteps, UiContextProvider, useUiContext } from "../lib/context";
 
 const Index: FC = () => {
-  const { HermezWallet } = JsBundle;
-  const [provider, setProvider] = useState<providers.Web3Provider>();
-  const [charterAccepted, setCharterAccepted] = useState(false);
-  const [account, setAccount] = useState<string>();
-  const [hermezWalletAddress, setHermezWalletAddress] = useState<string>();
-
-  const connectWallet = async () => {
-    if (!window.ethereum?.request) {
-      alert("MetaMask is not installed");
-      return;
-    }
-
-    const provider = new providers.Web3Provider(window.ethereum);
-    const accounts = await window.ethereum.request({
-      method: "eth_requestAccounts",
-    });
-
-    setProvider(provider);
-    setAccount(accounts[0]);
-  };
-
-  // const getBalance = async () => {
-  //   if (provider && account) {
-  //     const signerBalance = await provider.getSigner().getBalance();
-  //     const balance = ethers.utils.formatUnits(signerBalance, 18);
-  //     setSignerBalance(balance);
-  //   }
-  // };
-
-  const getHermezWallet = async function () {
-    if (!provider || !account) return alert("Not connected");
-
-    const signer = provider.getSigner();
-    return HermezWallet.createWalletFromEtherAccount(
-      signer,
-    );
-  };
-
-  const newVote = async () => {
-    if (!account || !provider) return alert("Not connected");
-
-    let contract = new Contract(CONTRACT_ADDRESS, ABI, provider.getSigner());
-    contract = contract.connect(provider);
-
-    // TODO: create several wallets
-    const hWallet = await getHermezWallet();
-
-    // TODO: generate census
-
-    // TODO: send create vote TX
-    /*
-    const tx = await contract.functions.newProcess(
-      txHash,
-      censusRoot,
-      censusSize,
-      resPubStartBlock,
-      resPubWindow,
-      minParticipation,
-      typ,
-    );
-
-    await tx.wait();
-
-    alert("Created");
-    */
-  };
-
-  const handleVote = async (approveValue: boolean) => {
-    if (!provider || !account) return alert("Not connected");
-
-    const hermezWallet = await getHermezWallet();
-    const hermezWalletAddress = hermezWallet?.hermezEthereumAddress;
-    setHermezWalletAddress(hermezWalletAddress);
-
-    // TODO: Get the available wallets
-
-    // Generate proofs locally
-
-    // Store payloads locally
-
-    // Aggregate proofs
-  };
-
-  const signPayload = async () => {
-  };
-
-  const submitResults = async (pid: string, hWallets: any[]) => {
-    // TODO: sign/vote with the available wallets
-
-    // TODO: Aggregate the results
-
-    // TODO: Submit the results
-    /*
-    const tx = await contract.functions.publishResult(
-      receiptsRoot,
-      result,
-      nVotes,
-      a, b, c
-    );
-
-    await tx.wait();
-
-    alert("Created");
-    */
-  };
-
   return (
-    <>
+    <UiContextProvider>
       <Head>
         <script src="./static/main.js"></script>
         <title>Charter sign app</title>
@@ -151,47 +31,127 @@ const Index: FC = () => {
 
           <VSpace />
           <VSpace />
-          <label>
-            <input
-              type="checkbox"
-              checked={charterAccepted}
-              onChange={() => setCharterAccepted(!charterAccepted)}
-            />
-            &nbsp; I have read and accept the terms outlined above by joining
-            the Aragon DAO
-          </label>
-          <VSpace />
 
-          <If condition={charterAccepted}>
-            <Then>
-              <If condition={account}>
-                <Then>
-                  <p>Account: {account}</p>
-                </Then>
-                <Else>
-                  <button onClick={connectWallet}>Connect</button>
-                </Else>
-              </If>
-
-              <VSpace />
-
-              <When condition={provider && account}>
-                <div style={{ textAlign: "center" }}>
-                  <button onClick={() => handleVote(true)}>VOTE YES</button>
-                  <HSpace />
-                  <button onClick={() => handleVote(false)}>VOTE NO</button>
-
-                  <When condition={hermezWalletAddress}>
-                    <p>Hermez address: {hermezWalletAddress}</p>
-                  </When>
-
-                  <VSpace />
-                </div>
-              </When>
-            </Then>
-          </If>
+          <FormStepMux />
         </main>
       </div>
+    </UiContextProvider>
+  );
+};
+
+const FormStepMux: FC = () => {
+  const {
+    step,
+    provider,
+    signerAddress,
+    charterAccepted,
+    methods,
+  } = useUiContext();
+
+  switch (step) {
+    case FormSteps.ACCEPT_CHARTER:
+      return <StepAccept />;
+    case FormSteps.CONNECTING_WALLET:
+      return <StepConnectingWallet />;
+    case FormSteps.GENERATE_BJJ_WALLETS:
+      return <StepGenerateBabyJubJubWallets />;
+    case FormSteps.GENERATING_BJJ_WALLETS:
+      return <StepGeneratingBabyJubJubWallets />;
+    default:
+      return <p>(not implemented)</p>;
+  }
+
+  return (
+    <>
+      <If condition={charterAccepted}>
+        <Then>
+          <If condition={signerAddress}>
+            <Then>
+              <p>
+                Connected with: <code>{signerAddress}</code>
+              </p>
+            </Then>
+            <Else>
+              <button onClick={methods.nextStep}>Connect wallet</button>
+            </Else>
+          </If>
+
+          <VSpace />
+
+          <When condition={provider && signerAddress}>
+            <div style={{ textAlign: "center" }}>
+              {
+                /* <button onClick={() => handleVote(true)}>VOTE YES</button>
+              <HSpace />
+              <button onClick={() => handleVote(false)}>VOTE NO</button>
+
+              <When condition={hermezWalletAddress}>
+                <p>Hermez address: {hermezWalletAddress}</p>
+              </When>
+
+              <VSpace />
+                */
+              }
+            </div>
+          </When>
+        </Then>
+      </If>
+    </>
+  );
+};
+
+const StepAccept: FC = () => {
+  const {
+    charterAccepted,
+    methods,
+  } = useUiContext();
+
+  return (
+    <>
+      <label>
+        <input
+          type="checkbox"
+          checked={charterAccepted}
+          onChange={() => methods.setCharterAccepted(!charterAccepted)}
+        />
+        &nbsp; I have read and accept the terms outlined above by joining the
+        Aragon DAO
+      </label>
+
+      <VSpace />
+
+      <button onClick={methods.nextStep}>Continue</button>
+    </>
+  );
+};
+
+const StepConnectingWallet: FC = () => {
+  return <p>Connecting to Metamask...</p>;
+};
+
+const StepGenerateBabyJubJubWallets: FC = () => {
+  const { methods } = useUiContext();
+
+  return (
+    <>
+      <p>
+        Next, you are going to generate the Baby Jub Jub wallets and compute the
+        census
+      </p>
+
+      <VSpace />
+
+      <button onClick={methods.nextStep}>Continue</button>
+    </>
+  );
+};
+
+const StepGeneratingBabyJubJubWallets: FC = () => {
+  return (
+    <>
+      <p>
+        Generating the wallets and creating the census, please wait...
+      </p>
     </>
   );
 };

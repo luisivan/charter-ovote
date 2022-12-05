@@ -1,0 +1,14 @@
+{
+  "name": "cjs-bundler",
+  "version": "1.0.0",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "circomlibjs": "^0.1.7"
+  },
+  "devDependencies": {
+    "browserify": "^17.0.0"
+  }
+}
