@@ -244,9 +244,9 @@ export async function vote(
     nullifier,
     voteValue,
     VOTE_WEIGHT,
-    proof.pi_a,
-    proof.pi_b,
-    proof.pi_c,
+    [proof.pi_a[0], proof.pi_a[1]],
+    [proof.pi_b[0], proof.pi_b[1]],
+    [proof.pi_c[0], proof.pi_c[1]],
   );
   const receipt = await tx.wait();
 

@@ -140,43 +140,45 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
   const submitVote = async () => {
     if (!provider) throw new Error("Not connected");
 
-    // Get proof
-    const voterIdx = 0;
-    const myWallet = wallets[voterIdx];
+    try {
+      // Get proof
+      const voterIdx = 0;
+      const myWallet = wallets[voterIdx];
 
-    const charterHash = getCharterHash(CHARTER_CONTENT);
+      const charterHash = getCharterHash(CHARTER_CONTENT);
 
-    console.log("Creating proposal");
-    const proposalId = await newProposal(censusTree, charterHash, provider);
+      console.log("Creating proposal");
+      const proposalId = await newProposal(censusTree, charterHash, provider);
 
-    // ZK Proof
-    const zkProof = await generateZkProof(
-      CHAIN_ID,
-      proposalId,
-      censusTree,
-      VOTE,
-      CHARTER_CONTENT,
-      voterIdx,
-      myWallet,
-    );
-    const { proof, publicSignals } = zkProof;
+      // ZK Proof
+      const zkProof = await generateZkProof(
+        CHAIN_ID,
+        proposalId,
+        censusTree,
+        VOTE,
+        CHARTER_CONTENT,
+        voterIdx,
+        myWallet,
+      );
+      // const { proof, publicSignals } = zkProof;
 
-    console.log(proof);
+      setStep(FormSteps.SUBMITTING_VOTE);
 
-    setStep(FormSteps.SUBMITTING_VOTE);
+      // Voting
+      const success = await vote(
+        CHAIN_ID,
+        proposalId,
+        VOTE,
+        provider,
+        myWallet,
+        zkProof.proof,
+      );
+      if (!success) throw new Error();
 
-    // Voting
-    const success = await vote(
-      CHAIN_ID,
-      proposalId,
-      VOTE,
-      provider,
-      myWallet,
-      proof,
-    );
-    if (!success) return setStep(FormSteps.FAILURE);
-
-    setStep(FormSteps.SUCCESS);
+      setStep(FormSteps.SUCCESS);
+    } catch (err) {
+      setStep(FormSteps.FAILURE);
+    }
   };
 
   const value: UiContext = {
