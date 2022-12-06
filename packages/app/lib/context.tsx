@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext, useState } from "react";
 import { providers } from "ethers";
+import { BASE_STRING, CHAIN_ID, CHARTER_CONTENT, VOTE } from "../lib/constants";
 import {
   BjjWallet,
   buildCensus,
@@ -11,12 +12,6 @@ import {
   vote,
 } from "./logic";
 
-const BASE_STRING =
-  "This message will be used to generate derived Baby JubJub wallets";
-const CHARTER_CONTENT = "I accept the Aragon Charter";
-const CHAIN_ID = 5;
-const VOTE = 1;
-
 // Exported types and data models
 type UiContext = {
   step: FormSteps;
@@ -25,6 +20,7 @@ type UiContext = {
   signerAddress: string;
 
   charterAccepted: boolean;
+  wallets: BjjWallet[];
   methods: {
     nextStep: () => void;
     setCharterAccepted: (v: boolean) => void;
@@ -49,6 +45,7 @@ const UiContext = createContext<UiContext>({
   signer: undefined,
   signerAddress: "",
   charterAccepted: false,
+  wallets: [],
   methods: {
     nextStep: () => {},
     setCharterAccepted: () => {},
@@ -187,6 +184,7 @@ export function UiContextProvider({ children }: { children: ReactNode }) {
     signer,
     signerAddress,
     charterAccepted,
+    wallets,
     methods: {
       nextStep,
       setCharterAccepted,

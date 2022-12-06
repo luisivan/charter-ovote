@@ -1,15 +1,13 @@
 import { Contract, providers, utils } from "ethers";
 import { toUtf8Bytes } from "ethers/lib/utils";
-import { ABI } from "../lib/constants";
-
-// const VERIFIER_CONTRACT = "0xd8b867f74c236e645a2984f8b0a1854a12c36cc6";
-const VOTING_CONTRACT = "0xf4ef16da1f057ffdebd9474e336d851fce8f8f0d";
-const CIRCUIT_WASM_URL = "/static/circuit.wasm";
-const CIRCUIT_ZKEY_URL = "/static/circuit.zkey";
-
-const CIRCOM_CIRCUIT_LEVEL_COUNT = 7; // not used here
-const CIRCUIT_LEVEL_COUNT = CIRCOM_CIRCUIT_LEVEL_COUNT + 1;
-const VOTE_WEIGHT = 1;
+import {
+  ABI,
+  CIRCUIT_LEVEL_COUNT,
+  CIRCUIT_WASM_URL,
+  CIRCUIT_ZKEY_URL,
+  VOTE_WEIGHT,
+  VOTING_CONTRACT,
+} from "../lib/constants";
 
 export type SecretKey = Uint8Array;
 export type PublicKey = [Uint8Array, Uint8Array];

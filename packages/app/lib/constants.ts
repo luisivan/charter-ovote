@@ -1,3 +1,18 @@
+export const BASE_STRING =
+  "This message will be used to generate derived Baby JubJub wallets";
+export const CHARTER_CONTENT = "I accept the Aragon Charter";
+export const CHAIN_ID = 5;
+export const VOTE = 1;
+
+// export const VERIFIER_CONTRACT = "0xd8b867f74c236e645a2984f8b0a1854a12c36cc6";
+export const VOTING_CONTRACT = "0xf4ef16da1f057ffdebd9474e336d851fce8f8f0d";
+export const CIRCUIT_WASM_URL = "/static/circuit.wasm";
+export const CIRCUIT_ZKEY_URL = "/static/circuit.zkey";
+
+const CIRCOM_CIRCUIT_LEVEL_COUNT = 7; // not used here
+export const CIRCUIT_LEVEL_COUNT = CIRCOM_CIRCUIT_LEVEL_COUNT + 1;
+export const VOTE_WEIGHT = 1;
+
 export const ABI = [{
   "inputs": [{
     "internalType": "address",

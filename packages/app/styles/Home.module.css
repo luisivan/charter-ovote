@@ -15,7 +15,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(rgba(49, 100, 250, 1), white, #fff);
+  background: radial-gradient(rgba(49, 100, 250, 0.5), white, #fff);
 }
 
 .header {
@@ -107,15 +107,41 @@
   line-height: 1.5;
 }
 
+.mainBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  text-align: center;
+
+  background-color: #ffffffaa;
+  
+  width: 100%;
+  max-width: 920px;
+  min-height: 140px;
+  padding: 16px;
+  filter: drop-shadow(7px 6px 0.75rem #5553);
+  border-radius: 4px;
+}
+
 .iframe {
   border: none;
   width: 100%;
+  max-width: 920px;
   height: 50vh;
-  border-radius: 32px;
+  border-radius: 4px;
+  margin: 16px;
 }
 
 .logo {
   width: 64px;
+}
+
+.button {
+  font-size: 15px;
+  padding: 6px 12px;
 }
 
 .fff {

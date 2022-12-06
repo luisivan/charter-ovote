@@ -22,16 +22,18 @@ const Index: FC = () => {
             <img src="/fight-for-freedom.svg" className={styles.fff} />
           </div>
 
+          <div className={styles.mainBody}>
+            <FormStepMux />
+          </div>
+
+          <VSpace />
+          <VSpace />
+
           <iframe
             className={styles.iframe}
             src="https://linked.md/v?u=https://linked.md/api/github/luisivan/charter-ovote/main/Charter.linked.md"
           >
           </iframe>
-
-          <VSpace />
-          <VSpace />
-
-          <FormStepMux />
         </main>
       </div>
     </UiContextProvider>
@@ -85,7 +87,9 @@ const StepAccept: FC = () => {
 
       <VSpace />
 
-      <button onClick={methods.nextStep}>Continue</button>
+      <button className={styles.button} onClick={methods.nextStep}>
+        Continue
+      </button>
     </>
   );
 };
@@ -100,13 +104,15 @@ const StepGenerateBabyJubJubWallets: FC = () => {
   return (
     <>
       <p>
-        Next, you are going to generate the Baby Jub Jub wallets and compute the
-        census
+        Click continue to generate the Baby Jub Jub wallets and compute the
+        census for the vote
       </p>
 
       <VSpace />
 
-      <button onClick={methods.nextStep}>Continue</button>
+      <button className={styles.button} onClick={methods.nextStep}>
+        Continue
+      </button>
     </>
   );
 };
@@ -122,18 +128,27 @@ const StepGeneratingBabyJubJubWallets: FC = () => {
 };
 
 const StepComputeVote: FC = () => {
-  const { methods } = useUiContext();
+  const { wallets, methods } = useUiContext();
+
+  const pubK = wallets?.[0]?.pubK;
 
   return (
     <>
       <p>
-        The census is created. You can finally compute your vote and submit it
-        on-chain.
+        Created a census with 5 wallets.
       </p>
+      <p>
+        Your Baby Jub Jub public key is <br />
+        <code>{bytesToHex(pubK[0])}</code> -
+        <code>{bytesToHex(pubK[1])}</code>
+      </p>
+      <p>You can finally compute your vote proof and submit it on-chain.</p>
 
       <VSpace />
 
-      <button onClick={methods.nextStep}>Continue</button>
+      <button className={styles.button} onClick={methods.nextStep}>
+        Continue
+      </button>
     </>
   );
 };
@@ -153,5 +168,16 @@ const StepFailure: FC = () => {
 
 const VSpace = () => <div style={{ height: 30 }} />;
 const HSpace = () => <span style={{ marginLeft: 20 }} />;
+
+// helpers
+function bytesToHex(buff: Uint8Array, prepend0x?: boolean): string {
+  const bytes: string[] = [];
+  for (let i = 0; i < buff.length; i++) {
+    if (buff[i] >= 16) bytes.push(buff[i].toString(16));
+    else bytes.push("0" + buff[i].toString(16));
+  }
+  if (prepend0x) return "0x" + bytes.join("");
+  return bytes.join("");
+}
 
 export default Index;
