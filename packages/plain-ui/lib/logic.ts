@@ -158,7 +158,7 @@ export async function generateZkProof(
     throw new Error("The census is empty");
   }
 
-  const F = poseidon.F;
+  const { F } = poseidon;
 
   // Generate signature over vote + charter hash
   const charterHash = getCharterHash(charterContent);
@@ -213,9 +213,11 @@ export async function newProposal(
   charterHash: bigint,
   provider: providers.Web3Provider,
 ) {
+  const { F } = poseidon;
   const contract = getVotingContract(provider);
 
-  const tx = await contract.functions.newProcess(censusTree.root, charterHash);
+  const censusRoot = F.toObject(censusTree.root).toString();
+  const tx = await contract.functions.newProcess(censusRoot, charterHash);
   const receipt = await tx.wait();
 
   // EventProcessCreated
@@ -234,6 +236,7 @@ export async function vote(
   wallet: BjjWallet,
   proof: ZkProof,
 ) {
+  const { F } = poseidon;
   const contract = getVotingContract(provider);
 
   // Compute nullifier
@@ -241,7 +244,7 @@ export async function vote(
 
   const tx = await contract.functions.vote(
     proposalId,
-    nullifier,
+    F.toObject(nullifier).toString(),
     voteValue,
     VOTE_WEIGHT,
     [proof.pi_a[0], proof.pi_a[1]],
