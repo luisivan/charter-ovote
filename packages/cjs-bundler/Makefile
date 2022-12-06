@@ -37,7 +37,7 @@ main: $(TARGET_BUNDLE_MAIN) package.json
 
 ## copy: Copy the artifacts to the UI project
 copy: $(TARGET_BUNDLE_MAIN) package.json
-	cp $(TARGET_BUNDLE_MAIN) ../plain-ui/static/main.js
+	cp $(TARGET_BUNDLE_MAIN) ../app/static/main.js
 
 $(TARGET_BUNDLE_MAIN): $(ENTRY_POINT_MAIN) package.json
 	mkdir -p $(BUILD_PATH)
